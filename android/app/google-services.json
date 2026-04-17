@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "766797793113",
+    "project_id": "rickoins",
+    "storage_bucket": "rickoins.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:766797793113:android:39c5ba095625aab3566e48",
+        "android_client_info": {
+          "package_name": "com.example.rickoins"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDH7sT6nMX9oQO74NaE52OD-8kf8qFapc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
