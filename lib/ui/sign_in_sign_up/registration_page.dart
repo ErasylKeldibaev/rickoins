@@ -47,6 +47,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
         throw Exception('User is null after registration');
       }
 
+      // Сохраняем дополнительные данные в Realtime Database
       await FirebaseDatabase.instance.ref('users/${user.uid}').set({
         'nickname': nicknameController.text.trim(),
         'email': emailController.text.trim(),
@@ -65,21 +66,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
-      String message = 'Registration error';
+      // Выводим e.message, чтобы видеть реальную причину от Firebase
+      String message = e.message ?? 'Registration error';
 
       if (e.code == 'email-already-in-use') {
         message = 'This email is already registered';
-      } else if (e.code == 'invalid-email') {
-        message = 'Invalid email';
-      } else if (e.code == 'weak-password') {
-        message = 'Weak password';
       } else if (e.code == 'operation-not-allowed') {
-        message = 'Email/Password auth is disabled in Firebase';
+        message = 'Email/Password auth is disabled in Firebase Console';
       }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(content: Text('Firebase: $message')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -107,30 +105,32 @@ class _RegistrationPageState extends State<RegistrationPage> {
       appBar: AppBar(title: const Text('Registration')),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextField(
-              controller: nicknameController,
-              decoration: const InputDecoration(labelText: 'Nickname'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: isLoading ? null : register,
-              child: Text(isLoading ? 'Loading...' : 'Register'),
-            ),
-          ],
+        child: SingleChildScrollView( // Добавил скролл на случай клавиатуры
+          child: Column(
+            children: [
+              TextField(
+                controller: nicknameController,
+                decoration: const InputDecoration(labelText: 'Nickname'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password'),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: isLoading ? null : register,
+                child: Text(isLoading ? 'Loading...' : 'Register'),
+              ),
+            ],
+          ),
         ),
       ),
     );

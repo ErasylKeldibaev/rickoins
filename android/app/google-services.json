@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "766797793113",
+    "firebase_url": "https://rickoins-default-rtdb.firebaseio.com",
     "project_id": "rickoins",
     "storage_bucket": "rickoins.firebasestorage.app"
   },

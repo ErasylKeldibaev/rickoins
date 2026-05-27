@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '766797793113',
     projectId: 'rickoins',
     authDomain: 'rickoins.firebaseapp.com',
+    databaseURL: 'https://rickoins-default-rtdb.firebaseio.com',
     storageBucket: 'rickoins.firebasestorage.app',
   );
 
@@ -54,6 +55,7 @@ class DefaultFirebaseOptions {
     appId: '1:766797793113:android:39c5ba095625aab3566e48',
     messagingSenderId: '766797793113',
     projectId: 'rickoins',
+    databaseURL: 'https://rickoins-default-rtdb.firebaseio.com',
     storageBucket: 'rickoins.firebasestorage.app',
   );
 
@@ -62,6 +64,7 @@ class DefaultFirebaseOptions {
     appId: '1:766797793113:ios:69ee86e64ff9f4be566e48',
     messagingSenderId: '766797793113',
     projectId: 'rickoins',
+    databaseURL: 'https://rickoins-default-rtdb.firebaseio.com',
     storageBucket: 'rickoins.firebasestorage.app',
     iosBundleId: 'com.example.rickoins',
   );
@@ -71,6 +74,7 @@ class DefaultFirebaseOptions {
     appId: '1:766797793113:ios:69ee86e64ff9f4be566e48',
     messagingSenderId: '766797793113',
     projectId: 'rickoins',
+    databaseURL: 'https://rickoins-default-rtdb.firebaseio.com',
     storageBucket: 'rickoins.firebasestorage.app',
     iosBundleId: 'com.example.rickoins',
   );
@@ -81,6 +85,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '766797793113',
     projectId: 'rickoins',
     authDomain: 'rickoins.firebaseapp.com',
+    databaseURL: 'https://rickoins-default-rtdb.firebaseio.com',
     storageBucket: 'rickoins.firebasestorage.app',
   );
+
 }
