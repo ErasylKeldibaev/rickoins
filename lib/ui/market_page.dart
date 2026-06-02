@@ -1,121 +1,413 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:provider/provider.dart';
-
-import '../states/local_user_provider.dart';
+import 'package:flutter/material.dart';
+import '../components/item_chat_bubble.dart';
+import '../components/message_create_card_widget.dart';
+import '../components/rick_coins_sale_buys_card_widget.dart';
+import '../components/top_bar_widget.dart';
 
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
-
   @override
   State<MarketPage> createState() => _MarketPageState();
 }
 
 class _MarketPageState extends State<MarketPage> {
-  List<Map<String, dynamic>> _users = [];
-  bool _isLoading = true;
-  bool _tradeExpanded = false;
-  bool _msgExpanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUsers();
-  }
-
-  Future<void> _loadUsers() async {
-    setState(() => _isLoading = true);
-    try {
-      final snap = await FirebaseDatabase.instance.ref('users').get();
-      if (!snap.exists) { setState(() => _isLoading = false); return; }
-      final raw = Map<String, dynamic>.from(snap.value as Map);
-      final currentUid = FirebaseAuth.instance.currentUser?.uid;
-      final list = raw.entries.where((e) => e.key != currentUid).map((e) {
-        final m = Map<String, dynamic>.from(e.value as Map);
-        m['uid'] = e.key;
-        return m;
-      }).toList();
-      setState(() { _users = list; _isLoading = false; });
-    } catch (_) { setState(() => _isLoading = false); }
-  }
+  bool isSaleBuyCardShown = false;
+  bool isMessageCardShown = false;
+  String _searchQuery = '';
+  String _sortBy = 'coins_desc';
 
   @override
   Widget build(BuildContext context) {
-    final up = context.watch<UserProvider>();
-
     return Scaffold(
-      backgroundColor: const Color(0xFFD4F5C4),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadUsers,
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1A1A2E),
+              Color(0xFF16213E),
+              Color(0xFF0F3460),
+              Color(0xFF533483),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
             children: [
-              // ── TITLE ──
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Center(
-                  child: Text('Rickkoins Market',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFCC0000))),
-                ),
-              ),
-
-              // ── MY PROFILE ROW ──
+              // ── HEADER ──
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundImage: up.avatar.isNotEmpty ? NetworkImage(up.avatar) : null,
-                      child: up.avatar.isEmpty ? const Icon(Icons.person, size: 28) : null,
+                    ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [Color(0xFFFFD700), Color(0xFFFF6B35)],
+                      ).createShader(bounds),
+                      child: const Text(
+                        '💰 Rick Coins Market',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('User name:', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                      Text(up.nickname, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text('Balance: ${up.coins} Rc\$',
-                          style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                    ]),
+                    const SizedBox(height: 12),
+                    TopBarWidget(showLogoutButton: false),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              // ── TOGGLES ──
+              // ── SEARCH BAR ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(children: [
-                  const Text('Toggle Trade: '),
-                  _ToggleBtn(
-                    color: Colors.red.shade400,
-                    expanded: _tradeExpanded,
-                    onTap: () => setState(() => _tradeExpanded = !_tradeExpanded),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6C63FF), Color(0xFFE040FB)],
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6C63FF).withOpacity(0.5),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 20),
-                  const Text('Toggle Msg: '),
-                  _ToggleBtn(
-                    color: Colors.blue.shade700,
-                    expanded: _msgExpanded,
-                    onTap: () => setState(() => _msgExpanded = !_msgExpanded),
+                  child: TextField(
+                    onChanged: (v) =>
+                        setState(() => _searchQuery = v.toLowerCase()),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: '🔍  Search user...',
+                      hintStyle: const TextStyle(color: Colors.white60),
+                      prefixIcon:
+                      const Icon(Icons.search, color: Colors.white70),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding:
+                      const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
-                ]),
+                ),
               ),
-
-              if (_tradeExpanded) _TradePanel(up: up),
-              if (_msgExpanded) _MsgPanel(up: up),
 
               const SizedBox(height: 10),
 
-              // ── USER CARDS ──
-              if (_isLoading)
-                const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-              else if (_users.isEmpty)
-                const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No users yet')))
-              else
-                ..._users.map((u) => _MarketCard(userData: u)),
+              // ── SORT + TOGGLES ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding:
+                        const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _sortBy,
+                            dropdownColor: const Color(0xFF0F3460),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13),
+                            icon: const Icon(Icons.sort,
+                                color: Colors.white60, size: 18),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'coins_desc',
+                                  child: Text('💰 Coins ↓')),
+                              DropdownMenuItem(
+                                  value: 'coins_asc',
+                                  child: Text('💰 Coins ↑')),
+                              DropdownMenuItem(
+                                  value: 'name',
+                                  child: Text('🔤 By name')),
+                            ],
+                            onChanged: (v) =>
+                                setState(() => _sortBy = v!),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _GradientToggleBtn(
+                      label: 'Trade',
+                      icon: Icons.swap_horiz,
+                      active: isSaleBuyCardShown,
+                      gradient: const LinearGradient(colors: [
+                        Color(0xFFFF6B35),
+                        Color(0xFFFF8E53)
+                      ]),
+                      onTap: () => setState(() {
+                        isSaleBuyCardShown = !isSaleBuyCardShown;
+                        if (isSaleBuyCardShown) isMessageCardShown = false;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _GradientToggleBtn(
+                      label: 'Msg',
+                      icon: Icons.chat_bubble_outline,
+                      active: isMessageCardShown,
+                      gradient: const LinearGradient(colors: [
+                        Color(0xFF00C9FF),
+                        Color(0xFF92FE9D)
+                      ]),
+                      onTap: () => setState(() {
+                        isMessageCardShown = !isMessageCardShown;
+                        if (isMessageCardShown) isSaleBuyCardShown = false;
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (isSaleBuyCardShown)
+                _GlassCard(child: RickCoinsSaleBuyCardWidget()),
+              if (isMessageCardShown)
+                _GlassCard(child: MessageCreateCardWidget()),
+
+              const SizedBox(height: 8),
+
+              // ── USERS LIST ──
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('user_persons')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    // ── ОТЛАДКА ──
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline,
+                                color: Colors.red, size: 48),
+                            const SizedBox(height: 12),
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'Ошибка Firestore:\n${snapshot.error}',
+                                style: const TextStyle(
+                                    color: Colors.red, fontSize: 14),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => setState(() {}),
+                              child: const Text('Повторить'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                                color: Color(0xFFFFD700)),
+                            SizedBox(height: 12),
+                            Text('Загрузка пользователей...',
+                                style: TextStyle(color: Colors.white54)),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData ||
+                        snapshot.data!.docs.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.people_outline,
+                                color: Colors.white38, size: 64),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Коллекция user_persons пуста.\nЗарегистрируйте ещё одного пользователя.',
+                              style: TextStyle(
+                                  color: Colors.white54, fontSize: 14),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            // КНОПКА ДИАГНОСТИКИ
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                  const Color(0xFF6C63FF)),
+                              onPressed: () async {
+                                try {
+                                  final snap = await FirebaseFirestore
+                                      .instance
+                                      .collection('user_persons')
+                                      .get();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(SnackBar(
+                                      content: Text(
+                                          'Docs in Firestore: ${snap.docs.length}'),
+                                    ));
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(SnackBar(
+                                      content: Text('Error: $e'),
+                                    ));
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.bug_report),
+                              label: const Text('Проверить Firestore'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final String currentUid =
+                        FirebaseAuth.instance.currentUser?.uid ?? '';
+
+                    List<QueryDocumentSnapshot> users = snapshot
+                        .data!.docs
+                        .where((d) => d.id != currentUid)
+                        .toList();
+
+                    // FILTER
+                    if (_searchQuery.isNotEmpty) {
+                      users = users.where((d) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final name = (data['nickname'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final msg = (data['message'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        return name.contains(_searchQuery) ||
+                            msg.contains(_searchQuery);
+                      }).toList();
+                    }
+
+                    // SORT
+                    users.sort((a, b) {
+                      final da = a.data() as Map<String, dynamic>;
+                      final db = b.data() as Map<String, dynamic>;
+                      if (_sortBy == 'coins_desc') {
+                        return ((db['coins'] ?? 0) as num)
+                            .compareTo((da['coins'] ?? 0) as num);
+                      } else if (_sortBy == 'coins_asc') {
+                        return ((da['coins'] ?? 0) as num)
+                            .compareTo((db['coins'] ?? 0) as num);
+                      } else {
+                        return (da['nickname'] ?? '')
+                            .toString()
+                            .compareTo(
+                            (db['nickname'] ?? '').toString());
+                      }
+                    });
+
+                    if (users.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.search_off,
+                                color: Colors.white38, size: 64),
+                            const SizedBox(height: 12),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'Никого не найдено по "$_searchQuery"'
+                                  : 'Других пользователей нет',
+                              style: const TextStyle(
+                                  color: Colors.white54, fontSize: 16),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        // BADGE
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 4),
+                          child: Row(
+                            mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFFFD700),
+                                      Color(0xFFFF8C00)
+                                    ],
+                                  ),
+                                  borderRadius:
+                                  BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${users.length} traders',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              // UID текущего пользователя для отладки
+                              Text(
+                                'uid: ${FirebaseAuth.instance.currentUser?.uid?.substring(0, 6) ?? 'null'}...',
+                                style: const TextStyle(
+                                    color: Colors.white30,
+                                    fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        Expanded(
+                          child: ListView.builder(
+                            padding:
+                            const EdgeInsets.only(bottom: 20),
+                            itemCount: users.length,
+                            itemBuilder: (ctx, i) {
+                              final data = users[i].data()
+                              as Map<String, dynamic>;
+                              return _RankedChatBubble(
+                                rank: i + 1,
+                                userData: data,
+                                uid: users[i].id,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -124,29 +416,119 @@ class _MarketPageState extends State<MarketPage> {
   }
 }
 
-class _ToggleBtn extends StatelessWidget {
-  final Color color;
-  final bool expanded;
+// ── GRADIENT TOGGLE BUTTON ──
+class _GradientToggleBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active;
+  final LinearGradient gradient;
   final VoidCallback onTap;
-  const _ToggleBtn({required this.color, required this.expanded, required this.onTap});
+
+  const _GradientToggleBtn({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.gradient,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: color,
-        child: Icon(expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-            color: Colors.white, size: 20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding:
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: active ? gradient : null,
+          color: active ? null : Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active ? Colors.transparent : Colors.white24,
+          ),
+          boxShadow: active
+              ? [
+            BoxShadow(
+                color:
+                gradient.colors.first.withOpacity(0.4),
+                blurRadius: 8)
+          ]
+              : [],
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+              active ? Icons.keyboard_arrow_up : icon,
+              color: Colors.white,
+              size: 18),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold)),
+        ]),
       ),
     );
   }
 }
 
-class _MarketCard extends StatelessWidget {
+// ── GLASS CARD ──
+class _GlassCard extends StatelessWidget {
+  final Widget child;
+  const _GlassCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white24),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.2), blurRadius: 12),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+// ── RANKED CARD ──
+class _RankedChatBubble extends StatelessWidget {
+  final int rank;
   final Map<String, dynamic> userData;
-  const _MarketCard({required this.userData});
+  final String uid;
+
+  const _RankedChatBubble({
+    required this.rank,
+    required this.userData,
+    required this.uid,
+  });
+
+  LinearGradient _rankGradient() {
+    if (rank == 1)
+      return const LinearGradient(
+          colors: [Color(0xFFFFD700), Color(0xFFFF8C00)]);
+    if (rank == 2)
+      return const LinearGradient(
+          colors: [Color(0xFFC0C0C0), Color(0xFF808080)]);
+    if (rank == 3)
+      return const LinearGradient(
+          colors: [Color(0xFFCD7F32), Color(0xFF8B4513)]);
+    return const LinearGradient(
+        colors: [Color(0xFF6C63FF), Color(0xFFE040FB)]);
+  }
+
+  String _rankEmoji() {
+    if (rank == 1) return '🥇';
+    if (rank == 2) return '🥈';
+    if (rank == 3) return '🥉';
+    return '#$rank';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,122 +537,137 @@ class _MarketCard extends StatelessWidget {
     final message = userData['message']?.toString() ?? '';
     final coins = (userData['coins'] as num?)?.toInt() ?? 0;
     final sales = (userData['sales'] as num?)?.toInt() ?? 0;
-    final bying = userData['bying'];
+    final buying =
+        userData['buying'] ?? userData['bying'] ?? 'null';
 
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(
+        context,
+        '/two_person_trade_page',
+        arguments: {'nickname': nickname, 'uid': uid},
+      ),
+      child: Container(
+        margin:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withOpacity(0.12),
+              Colors.white.withOpacity(0.06),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border:
+          Border.all(color: Colors.white.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            // RANK
+            Container(
+              width: 44,
+              height: 90,
+              decoration: BoxDecoration(
+                gradient: _rankGradient(),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  _rankEmoji(),
+                  style: const TextStyle(fontSize: 18),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+
+            // AVATAR
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: CircleAvatar(
+                radius: 28,
+                backgroundImage: avatar.isNotEmpty
+                    ? NetworkImage(avatar)
+                    : null,
+                backgroundColor: Colors.white24,
+                child: avatar.isEmpty
+                    ? const Icon(Icons.person,
+                    color: Colors.white, size: 26)
+                    : null,
+              ),
+            ),
+
+            // INFO
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    vertical: 10, horizontal: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(nickname,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15)),
+                    if (message.isNotEmpty)
+                      Text(message,
+                          style: const TextStyle(
+                              color: Color(0xFF92FE9D),
+                              fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        _Badge('💰 $coins Rc\$',
+                            const Color(0xFFFFD700), Colors.black),
+                        _Badge('↑ sell: $sales',
+                            const Color(0xFF00C9FF), Colors.black),
+                        _Badge('↓ buy: $buying',
+                            const Color(0xFFFF6B35), Colors.white),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: Icon(Icons.arrow_forward_ios,
+                  color: Colors.white38, size: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String text;
+  final Color bg;
+  final Color textColor;
+  const _Badge(this.text, this.bg, this.textColor);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(14),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(children: [
-        CircleAvatar(
-          radius: 34,
-          backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
-          child: avatar.isEmpty ? const Icon(Icons.person, size: 30) : null,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nickname, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            if (message.isNotEmpty)
-              Text(message,
-                  style: const TextStyle(color: Color(0xFF3F51B5), fontSize: 13),
-                  maxLines: 2, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Row(children: [
-              const Text('Balance: ', style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
-              Text('$coins Rc\$', style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
-            ]),
-            Text('For sale: $sales',
-                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            Text("I'll buy: ${bying ?? 'null'}",
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          ]),
-        ),
-      ]),
-    );
-  }
-}
-
-class _TradePanel extends StatefulWidget {
-  final UserProvider up;
-  const _TradePanel({required this.up});
-  @override
-  State<_TradePanel> createState() => _TradePanelState();
-}
-class _TradePanelState extends State<_TradePanel> {
-  late final TextEditingController _salesCtrl;
-  late final TextEditingController _byingCtrl;
-  @override
-  void initState() {
-    super.initState();
-    _salesCtrl = TextEditingController(text: widget.up.sales.toString());
-    _byingCtrl = TextEditingController(text: widget.up.bying.toString());
-  }
-  @override
-  void dispose() { _salesCtrl.dispose(); _byingCtrl.dispose(); super.dispose(); }
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: Column(children: [
-          TextField(controller: _salesCtrl, keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'For sale (coins)')),
-          TextField(controller: _byingCtrl, keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "I'll buy (coins)")),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: () async {
-              await widget.up.updateField('sales', int.tryParse(_salesCtrl.text) ?? 0);
-              await widget.up.updateField('bying', int.tryParse(_byingCtrl.text) ?? 0);
-              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved!')));
-            },
-            child: const Text('Save'),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-class _MsgPanel extends StatefulWidget {
-  final UserProvider up;
-  const _MsgPanel({required this.up});
-  @override
-  State<_MsgPanel> createState() => _MsgPanelState();
-}
-class _MsgPanelState extends State<_MsgPanel> {
-  late final TextEditingController _ctrl;
-  @override
-  void initState() { super.initState(); _ctrl = TextEditingController(text: widget.up.message); }
-  @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: Column(children: [
-          TextField(controller: _ctrl, maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Your market message')),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: () async {
-              await widget.up.updateField('message', _ctrl.text.trim());
-              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved!')));
-            },
-            child: const Text('Save'),
-          ),
-        ]),
-      ),
+      child: Text(text,
+          style: TextStyle(
+              color: textColor,
+              fontSize: 11,
+              fontWeight: FontWeight.bold)),
     );
   }
 }

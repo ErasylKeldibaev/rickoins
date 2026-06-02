@@ -1,13 +1,13 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../states/local_user_provider.dart';
+import '../providers/local_user_provider.dart';
 
 class CabinetPage extends StatefulWidget {
   const CabinetPage({super.key});
@@ -25,34 +25,46 @@ class _CabinetPageState extends State<CabinetPage> {
   void initState() {
     super.initState();
     _loadFiles();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserProvider>().loadUserData();
-    });
   }
 
   Future<void> _loadFiles() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     try {
-      final snap = await FirebaseDatabase.instance.ref('files/$uid').get();
-      if (!snap.exists) { setState(() => _loadingFiles = false); return; }
-      final raw = Map<String, dynamic>.from(snap.value as Map);
+      final snap = await FirebaseFirestore.instance
+          .collection('user_files')
+          .doc(uid)
+          .collection('my_files')
+          .get();
+
       final pdfs = <Map<String, dynamic>>[];
       final words = <Map<String, dynamic>>[];
-      for (final e in raw.entries) {
-        final item = Map<String, dynamic>.from(e.value as Map);
-        item['key'] = e.key;
+
+      for (var doc in snap.docs) {
+        final item = doc.data();
+        item['key'] = doc.id;
         final name = item['name']?.toString() ?? '';
-        if (name.endsWith('.pdf')) { pdfs.add(item); }
-        else { words.add(item); }
+        if (name.toLowerCase().endsWith('.pdf')) {
+          pdfs.add(item);
+        } else {
+          words.add(item);
+        }
       }
-      setState(() { _pdfFiles = pdfs; _wordFiles = words; _loadingFiles = false; });
-    } catch (_) { setState(() => _loadingFiles = false); }
+      if (mounted) {
+        setState(() {
+          _pdfFiles = pdfs;
+          _wordFiles = words;
+          _loadingFiles = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingFiles = false);
+    }
   }
 
   Future<void> _uploadFile(String type) async {
     final result = await FilePicker.platform.pickFiles(
-      type: type == 'pdf' ? FileType.custom : FileType.custom,
+      type: FileType.custom,
       allowedExtensions: type == 'pdf' ? ['pdf'] : ['doc', 'docx'],
     );
     if (result == null || result.files.isEmpty) return;
@@ -64,29 +76,37 @@ class _CabinetPageState extends State<CabinetPage> {
     if (uid == null) return;
 
     try {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Uploading...')));
       }
       final storageRef = FirebaseStorage.instance.ref('files/$uid/${picked.name}');
       await storageRef.putFile(File(path));
       final url = await storageRef.getDownloadURL();
-      final dbRef = FirebaseDatabase.instance.ref('files/$uid').push();
-      await dbRef.set({'name': picked.name, 'url': url, 'type': type});
+
+      await FirebaseFirestore.instance
+          .collection('user_files')
+          .doc(uid)
+          .collection('my_files')
+          .add({'name': picked.name, 'url': url, 'type': type, 'createdAt': FieldValue.serverTimestamp()});
+
       await _loadFiles();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Uploaded!')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Uploaded!')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> _openFile(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final up = context.watch<UserProvider>();
+    final userProvider = context.watch<UserProvider>();
+    final userData = userProvider.userData;
 
     return Scaffold(
       backgroundColor: const Color(0xFFD4F5C4),
@@ -96,7 +116,6 @@ class _CabinetPageState extends State<CabinetPage> {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              // ── TITLE ──
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
                 child: Center(
@@ -104,29 +123,24 @@ class _CabinetPageState extends State<CabinetPage> {
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFCC0000))),
                 ),
               ),
-
-              // ── MY PROFILE ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Row(children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundImage: up.avatar.isNotEmpty ? NetworkImage(up.avatar) : null,
-                    child: up.avatar.isEmpty ? const Icon(Icons.person, size: 28) : null,
+                    backgroundImage: (userData?.avatar.isNotEmpty ?? false) ? NetworkImage(userData!.avatar) : null,
+                    child: (userData?.avatar.isEmpty ?? true) ? const Icon(Icons.person, size: 28) : null,
                   ),
                   const SizedBox(width: 12),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('User name:', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                    Text(up.nickname, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text('Balance: ${up.coins} Rc\$',
+                    Text(userData?.nickname ?? 'User', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('Balance: ${userData?.coins ?? 0} Rc\$',
                         style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                   ]),
                 ]),
               ),
-
               const SizedBox(height: 16),
-
-              // ── UPLOAD BUTTONS ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(children: [
@@ -145,17 +159,12 @@ class _CabinetPageState extends State<CabinetPage> {
                   ),
                 ]),
               ),
-
               const SizedBox(height: 20),
-
-              // ── PDF SECTION ──
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('PDF Scenarios',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text('PDF Scenarios', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 10),
-
               if (_loadingFiles)
                 const Center(child: CircularProgressIndicator())
               else if (_pdfFiles.isEmpty)
@@ -177,17 +186,12 @@ class _CabinetPageState extends State<CabinetPage> {
                     ),
                   ),
                 ),
-
               const SizedBox(height: 20),
-
-              // ── WORD SECTION ──
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('Word Scenarios',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text('Word Scenarios', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 10),
-
               if (!_loadingFiles && _wordFiles.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
@@ -207,17 +211,13 @@ class _CabinetPageState extends State<CabinetPage> {
                     ),
                   ),
                 ),
-
               const SizedBox(height: 24),
-
-              // ── LOGOUT ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
                   onPressed: () async {
                     await FirebaseAuth.instance.signOut();
-                    context.read<UserProvider>().clearUserData();
                   },
                   icon: const Icon(Icons.logout, color: Colors.white),
                   label: const Text('Log Out', style: TextStyle(color: Colors.white)),

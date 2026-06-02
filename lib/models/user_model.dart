@@ -1,45 +1,49 @@
 class UserModel {
-  final String uid;
-  final String nickname;
-  final String email;
-  final String avatar;
-  final int coins;
-  final int sales;
-  final int bying;
-  final String message;
+  String nickname;
+  String email;
+  String avatar;
+  int coins;
+  int buying;
+  int sales;
+  String message;
+  int individualBuy;
+  int individualSell;
 
-  const UserModel({
-    required this.uid,
+  UserModel({
     required this.nickname,
     required this.email,
-    required this.avatar,
-    required this.coins,
-    required this.sales,
-    required this.bying,
-    required this.message,
+    this.avatar = '',
+    this.coins = 0,
+    this.buying = 0,
+    this.sales = 0,
+    this.message = 'Good day',
+    this.individualBuy = 0,
+    this.individualSell = 0,
   });
 
-  factory UserModel.fromMap(Map<String, dynamic> map, String uid) {
+  factory UserModel.fromMap(Map<String, dynamic> data) {
     return UserModel(
-      uid: uid,
-      nickname: map['nickname']?.toString() ?? '',
-      email: map['email']?.toString() ?? '',
-      avatar: map['avatar']?.toString() ?? '',
-      coins: (map['coins'] as num?)?.toInt() ?? 0,
-      sales: (map['sales'] as num?)?.toInt() ?? 0,
-      bying: (map['bying'] as num?)?.toInt() ?? 0,
-      message: map['message']?.toString() ?? '',
+      nickname: data['nickname'] ?? '',
+      email: data['email'] ?? '',
+      avatar: data['avatar'] ?? '',
+      coins: data['coins'] ?? 0,
+      buying: data['buying'] ?? 0,
+      sales: data['sales'] ?? 0,
+      message: data['message'] ?? '',
+      individualBuy: data['individualBuy'] ?? 0,
+      individualSell: data['individualSell'] ?? 0,
     );
   }
 
   Map<String, dynamic> toMap() => {
-    'uid': uid,
     'nickname': nickname,
     'email': email,
     'avatar': avatar,
     'coins': coins,
+    'buying': buying,
     'sales': sales,
-    'bying': bying,
     'message': message,
+    'individualBuy': individualBuy,
+    'individualSell': individualSell,
   };
 }

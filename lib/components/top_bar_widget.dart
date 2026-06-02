@@ -5,11 +5,13 @@ import '../ui/cabinet_page.dart';
 import '../ui/sign_in_sign_up/login_page.dart';
 
 class TopBarWidget extends StatelessWidget {
-  final VoidCallback onMenuTap;
+  final VoidCallback? onMenuTap;
+  final bool showLogoutButton;
 
   const TopBarWidget({
     super.key,
-    required this.onMenuTap,
+    this.onMenuTap,
+    this.showLogoutButton = true,
   });
 
   @override

@@ -1,5 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class RegistrationPage extends StatefulWidget {
@@ -47,15 +47,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
         throw Exception('User is null after registration');
       }
 
-      // Сохраняем дополнительные данные в Realtime Database
-      await FirebaseDatabase.instance.ref('users/${user.uid}').set({
+      // Сохраняем дополнительные данные в Cloud Firestore
+      await FirebaseFirestore.instance.collection('user_persons').doc(user.uid).set({
         'nickname': nicknameController.text.trim(),
         'email': emailController.text.trim(),
         'avatar': '',
-        'coins': 0,
+        'coins': 10, // Даем начальные монеты
         'buying': 0,
         'sales': 0,
-        'message': '',
+        'message': 'Hello!',
+        'individualBuy': 0,
+        'individualSell': 0,
       });
 
       if (!mounted) return;
@@ -66,15 +68,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
-      // Выводим e.message, чтобы видеть реальную причину от Firebase
       String message = e.message ?? 'Registration error';
-
-      if (e.code == 'email-already-in-use') {
-        message = 'This email is already registered';
-      } else if (e.code == 'operation-not-allowed') {
-        message = 'Email/Password auth is disabled in Firebase Console';
-      }
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Firebase: $message')),
@@ -105,7 +99,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       appBar: AppBar(title: const Text('Registration')),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView( // Добавил скролл на случай клавиатуры
+        child: SingleChildScrollView(
           child: Column(
             children: [
               TextField(

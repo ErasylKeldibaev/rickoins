@@ -6,7 +6,7 @@ import '../components/character_info_card.dart';
 import '../models/btn_cartoon_model.dart';
 import '../models/character_model.dart';
 import '../services/character_service.dart';
-import '../states/local_user_provider.dart';
+import '../providers/local_user_provider.dart'; // Исправлен путь
 import 'show_cartoon_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -28,9 +28,6 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadCharacters();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserProvider>().loadUserData();
-    });
   }
 
   @override
@@ -68,7 +65,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final cartoons = BtnCartoonModel.getListCartoonModels();
-    final up = context.watch<UserProvider>();
+    final userProvider = context.watch<UserProvider>();
+    final userData = userProvider.userData;
 
     return Scaffold(
       backgroundColor: const Color(0xFFD6F5FF),
@@ -85,10 +83,10 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundImage: up.avatar.isNotEmpty
-                          ? NetworkImage(up.avatar)
+                      backgroundImage: (userData?.avatar.isNotEmpty ?? false)
+                          ? NetworkImage(userData!.avatar)
                           : null,
-                      child: up.avatar.isEmpty
+                      child: (userData?.avatar.isEmpty ?? true)
                           ? const Icon(Icons.person, size: 28)
                           : null,
                     ),
@@ -100,11 +98,11 @@ class _HomePageState extends State<HomePage> {
                           const Text('User name:',
                               style: TextStyle(
                                   fontSize: 11, color: Colors.black54)),
-                          Text(up.nickname,
+                          Text(userData?.nickname ?? 'User',
                               style: const TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.bold)),
-                          Text('Balance: ${up.coins} Rc\$',
+                          Text('Balance: ${userData?.coins ?? 0} Rc\$',
                               style: const TextStyle(
                                   color: Colors.green,
                                   fontWeight: FontWeight.bold)),
@@ -114,7 +112,6 @@ class _HomePageState extends State<HomePage> {
                     IconButton(
                       onPressed: () async {
                         await FirebaseAuth.instance.signOut();
-                        up.clearUserData();
                       },
                       icon: const Icon(Icons.logout, color: Colors.red),
                     ),
